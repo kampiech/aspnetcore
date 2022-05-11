@@ -1,11 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System;
 using System.Buffers;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
 using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http;
@@ -13,8 +9,6 @@ using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
 using Microsoft.AspNetCore.Testing;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
-using Xunit.Sdk;
 using HttpMethod = Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpMethod;
 
 namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
@@ -22,16 +16,6 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
     public class HttpParserTests
     {
         private static readonly IKestrelTrace _nullTrace = Mock.Of<IKestrelTrace>();
-        private readonly bool _enableLineFeedTerminator;
-
-        public HttpParserTests() : this(false)
-        {            
-        }
-
-        protected HttpParserTests(bool enableLineFeedTerminator)
-        {
-            _enableLineFeedTerminator = enableLineFeedTerminator;
-        }
 
         [Theory]
         [MemberData(nameof(RequestLineValidData))]
@@ -114,20 +98,14 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
 
         [Theory]
         [MemberData(nameof(RequestLineInvalidDataLineFeedTerminator))]
-        public void ParseRequestSucceedsOnInvalidRequestLineQuirkMode(string requestLine)
+        public void ParseRequestSucceedsOnInvalidRequestLineLineFeedTerminator(string requestLine)
         {
-            // Skip test when quirk mode is not enabled
-            if (!_enableLineFeedTerminator)
-            {
-                return;
-            }
-
             var mockTrace = new Mock<IKestrelTrace>();
             mockTrace
                 .Setup(trace => trace.IsEnabled(LogLevel.Information))
                 .Returns(true);
 
-            var parser = CreateParser(mockTrace.Object);
+            var parser = CreateParser(mockTrace.Object, enableLineFeedTerminator: true);
             var buffer = new ReadOnlySequence<byte>(Encoding.ASCII.GetBytes(requestLine));
             var requestHandler = new RequestHandler();
 
@@ -136,14 +114,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
 
         [Theory]
         [MemberData(nameof(RequestLineInvalidDataLineFeedTerminator))]
-        public void ParseRequestLineThrowsOnInvalidRequestLineQuirkMode(string requestLine)
+        public void ParseRequestLineThrowsOnInvalidRequestLineLineFeedTerminator(string requestLine)
         {
-            // Skip test when quirk mode is enabled
-            if (_enableLineFeedTerminator)
-            {
-                return;
-            }
-            
             var mockTrace = new Mock<IKestrelTrace>();
             mockTrace
                 .Setup(trace => trace.IsEnabled(LogLevel.Information))
@@ -301,6 +273,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         [InlineData("Connection: close\r\nCookie: \r\n\r\n", "Connection", "close", "Cookie", "")]
         [InlineData("Connection: close\r\nCookie:\r\n\r\n", "Connection", "close", "Cookie", "")]
         [InlineData("a:b\r\n\r\n", "a", "b", null, null)]
+        [InlineData("a: b\r\n\r\n", "a", "b", null, null)]
         public void ParseHeadersCanParseEmptyHeaderValues(
             string rawHeaders,
             string expectedHeaderName1,
@@ -330,19 +303,16 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         [InlineData("Connection: close\nCookie:\r\n\r\n", "Connection", "close", "Cookie", "")]
         [InlineData("Connection: close\r\nCookie:\n\r\n", "Connection", "close", "Cookie", "")]
         [InlineData("a:b\n\r\n", "a", "b", null, null)]
-        public void ParseHeadersCanParseSingleLineFeedInQuirkMode(
+        [InlineData("a: b\n\r\n", "a", "b", null, null)]
+        [InlineData("a:b\n\n", "a", "b", null, null)]
+        [InlineData("a: b\n\n", "a", "b", null, null)]
+        public void ParseHeadersCantParseSingleLineFeedWihtoutLineFeedTerminatorEnableb(
             string rawHeaders,
             string expectedHeaderName1,
             string expectedHeaderValue1,
             string expectedHeaderName2,
             string expectedHeaderValue2)
         {
-            // Skip test when quirk mode is enabled
-            if (_enableLineFeedTerminator)
-            {
-                return;
-            }
-
             var expectedHeaderNames = expectedHeaderName2 == null
                 ? new[] { expectedHeaderName1 }
                 : new[] { expectedHeaderName1, expectedHeaderName2 };
@@ -366,19 +336,13 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         [InlineData("Connection: close\r\nCookie: \n\r\n", "Connection", "close", "Cookie", "")]
         [InlineData("Connection: close\nCookie:\r\n\r\n", "Connection", "close", "Cookie", "")]
         [InlineData("Connection: close\r\nCookie:\n\r\n", "Connection", "close", "Cookie", "")]
-        public void ParseHeadersCantParseSingleLineFeedWithoutQuirkMode(
+        public void ParseHeadersCanParseSingleLineFeedWithLineFeedTerminatorEnabled(
             string rawHeaders,
             string expectedHeaderName1,
             string expectedHeaderValue1,
             string expectedHeaderName2,
             string expectedHeaderValue2)
         {
-            // Skip test when quirk mode is not enabled
-            if (!_enableLineFeedTerminator)
-            {
-                return;
-            }
-
             var expectedHeaderNames = expectedHeaderName2 == null
                 ? new[] { expectedHeaderName1 }
                 : new[] { expectedHeaderName1, expectedHeaderName2 };
@@ -386,7 +350,52 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
                 ? new[] { expectedHeaderValue1 }
                 : new[] { expectedHeaderValue1, expectedHeaderValue2 };
 
-            VerifyRawHeaders(rawHeaders, expectedHeaderNames, expectedHeaderValues);
+            VerifyRawHeaders(rawHeaders, expectedHeaderNames, expectedHeaderValues, enableLineFeedTerminator: true);
+        }
+
+        [Theory]
+        [InlineData("a: b\r\n\n", "a", "b", null, null)]
+        [InlineData("a: b\n\n", "a", "b", null, null)]
+        [InlineData("a: b\nc: d\r\n\n", "a", "b", "c", "d")]
+        [InlineData("a: b\nc: d\n\n", "a", "b", "c", "d")]
+        public void ParseHeadersCantEndWithLineFeedTerminator(
+            string rawHeaders,
+            string expectedHeaderName1,
+            string expectedHeaderValue1,
+            string expectedHeaderName2,
+            string expectedHeaderValue2)
+        {
+            var expectedHeaderNames = expectedHeaderName2 == null
+                ? new[] { expectedHeaderName1 }
+                : new[] { expectedHeaderName1, expectedHeaderName2 };
+            var expectedHeaderValues = expectedHeaderValue2 == null
+                ? new[] { expectedHeaderValue1 }
+                : new[] { expectedHeaderValue1, expectedHeaderValue2 };
+
+#pragma warning disable CS0618 // Type or member is obsolete
+            Assert.Throws<BadHttpRequestException>(() => VerifyRawHeaders(rawHeaders, expectedHeaderNames, expectedHeaderValues));
+#pragma warning restore CS0618 // Type or member is obsolete
+        }
+
+        [Theory]
+        [InlineData("a:b\n\r\n", "a", "b", null, null)]
+        [InlineData("a: b\n\r\n", "a", "b", null, null)]
+        [InlineData("a: b\nc: d\n\r\n", "a", "b", "c", "d")]
+        public void ParseHeadersCanEndAfterLineFeedTerminator(
+                    string rawHeaders,
+                    string expectedHeaderName1,
+                    string expectedHeaderValue1,
+                    string expectedHeaderName2,
+                    string expectedHeaderValue2)
+        {
+            var expectedHeaderNames = expectedHeaderName2 == null
+                ? new[] { expectedHeaderName1 }
+                : new[] { expectedHeaderName1, expectedHeaderName2 };
+            var expectedHeaderValues = expectedHeaderValue2 == null
+                ? new[] { expectedHeaderValue1 }
+                : new[] { expectedHeaderValue1, expectedHeaderValue2 };
+
+            VerifyRawHeaders(rawHeaders, expectedHeaderNames, expectedHeaderValues, enableLineFeedTerminator: true);
         }
 
         [Theory]
@@ -483,13 +492,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
 
         [Theory]
         [MemberData(nameof(RequestHeaderInvalidDataLineFeedTerminator))]
-        public void ParseHeadersThrowsOnInvalidRequestHeadersQuirkMode(string rawHeaders, string expectedExceptionMessage)
+        public void ParseHeadersThrowsOnInvalidRequestHeadersLineFeedTerminator(string rawHeaders, string expectedExceptionMessage)
         {
-            if (_enableLineFeedTerminator)
-            {
-                return;
-            }
-
             var mockTrace = new Mock<IKestrelTrace>();
             mockTrace
                 .Setup(trace => trace.IsEnabled(LogLevel.Information))
@@ -514,11 +518,6 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         [Fact]
         public void ExceptionDetailNotIncludedWhenLogLevelInformationNotEnabled()
         {
-            if (_enableLineFeedTerminator)
-            {
-                return;
-            }
-
             var mockTrace = new Mock<IKestrelTrace>();
             mockTrace
                 .Setup(trace => trace.IsEnabled(LogLevel.Information))
@@ -549,22 +548,19 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
             Assert.Equal(CoreStrings.FormatBadRequest_UnrecognizedHTTPVersion(string.Empty), exception.Message);
             Assert.Equal(StatusCodes.Status505HttpVersionNotsupported, exception.StatusCode);
 
-            if (!_enableLineFeedTerminator)
-            {
-                // Invalid request header
-                buffer = new ReadOnlySequence<byte>(Encoding.ASCII.GetBytes("Header: value\n\r\n"));
+            // Invalid request header
+            buffer = new ReadOnlySequence<byte>(Encoding.ASCII.GetBytes("Header: value\n\r\n"));
 
 #pragma warning disable CS0618 // Type or member is obsolete
-                exception = Assert.Throws<BadHttpRequestException>(() =>
+            exception = Assert.Throws<BadHttpRequestException>(() =>
 #pragma warning restore CS0618 // Type or member is obsolete
-                {
-                    var reader = new SequenceReader<byte>(buffer);
-                    parser.ParseHeaders(requestHandler, ref reader);
-                });
+            {
+                var reader = new SequenceReader<byte>(buffer);
+                parser.ParseHeaders(requestHandler, ref reader);
+            });
 
-                Assert.Equal(CoreStrings.FormatBadRequest_InvalidRequestHeader_Detail(string.Empty), exception.Message);
-                Assert.Equal(StatusCodes.Status400BadRequest, exception.StatusCode);
-            }
+            Assert.Equal(CoreStrings.FormatBadRequest_InvalidRequestHeader_Detail(string.Empty), exception.Message);
+            Assert.Equal(StatusCodes.Status400BadRequest, exception.StatusCode);
         }
 
         [Fact]
@@ -629,13 +625,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
 
         [Theory]
         [MemberData(nameof(RequestHeaderInvalidDataLineFeedTerminator))]
-        public void ParseHeadersThrowsOnInvalidRequestHeadersWithGratuitouslySplitBuffersQuirkMode(string rawHeaders, string expectedExceptionMessage)
+        public void ParseHeadersThrowsOnInvalidRequestHeadersWithGratuitouslySplitBuffersLineFeedTerminator(string rawHeaders, string expectedExceptionMessage)
         {
-            if (_enableLineFeedTerminator)
-            {
-                return;
-            }
-
             var mockTrace = new Mock<IKestrelTrace>();
             mockTrace
                 .Setup(trace => trace.IsEnabled(LogLevel.Information))
@@ -679,13 +670,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         [InlineData("A:B\r\nB: C\n\r\n")]
         public void ParseHeadersWithGratuitouslySplitBuffersQuirkMode(string headers)
         {
-            // Skip test when quirk mode is not enabled
-            if (!_enableLineFeedTerminator)
-            {
-                return;
-            }
-            
-            var parser = CreateParser(_nullTrace);
+            var parser = CreateParser(_nullTrace, enableLineFeedTerminator: true);
             var buffer = BytePerSegmentTestSequenceFactory.Instance.CreateWithContent(headers);
 
             var requestHandler = new RequestHandler();
@@ -731,11 +716,11 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
             Assert.True(buffer.Slice(reader.Position).IsEmpty);
         }
 
-        private void VerifyRawHeaders(string rawHeaders, IEnumerable<string> expectedHeaderNames, IEnumerable<string> expectedHeaderValues)
+        private void VerifyRawHeaders(string rawHeaders, IEnumerable<string> expectedHeaderNames, IEnumerable<string> expectedHeaderValues, bool enableLineFeedTerminator = false)
         {
             Assert.True(expectedHeaderNames.Count() == expectedHeaderValues.Count(), $"{nameof(expectedHeaderNames)} and {nameof(expectedHeaderValues)} sizes must match");
 
-            var parser = CreateParser(_nullTrace);
+            var parser = CreateParser(_nullTrace, enableLineFeedTerminator);
             var buffer = new ReadOnlySequence<byte>(Encoding.ASCII.GetBytes(rawHeaders));
 
             var requestHandler = new RequestHandler();
@@ -750,7 +735,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
             Assert.True(buffer.Slice(reader.Position).IsEmpty);
         }
 
-        private IHttpParser<RequestHandler> CreateParser(IKestrelTrace log) => new HttpParser<RequestHandler>(log.IsEnabled(LogLevel.Information), _enableLineFeedTerminator);
+        private IHttpParser<RequestHandler> CreateParser(IKestrelTrace log, bool enableLineFeedTerminator = false) => new HttpParser<RequestHandler>(log.IsEnabled(LogLevel.Information), enableLineFeedTerminator);
 
         public static IEnumerable<object[]> RequestLineValidData => HttpParsingData.RequestLineValidData;
 
@@ -850,14 +835,6 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
 
                 return CreateSegments(segments.ToArray());
             }
-        }
-    }
-
-    // Ensure that all common tests are still passing when the AcceptLineFeedAsLineTerminator quirk mode is enabled.
-    public class HttpParserQuirkModeTests : HttpParserTests
-    {
-        public HttpParserQuirkModeTests() : base(true)
-        {
         }
     }
 }
