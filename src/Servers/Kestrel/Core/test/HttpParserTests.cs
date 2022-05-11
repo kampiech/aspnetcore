@@ -300,6 +300,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         [InlineData("Cookie:\r\nConnection: close\r\n\r\n", "Cookie", "", "Connection", "close")]
         [InlineData("Connection: close\r\nCookie: \r\n\r\n", "Connection", "close", "Cookie", "")]
         [InlineData("Connection: close\r\nCookie:\r\n\r\n", "Connection", "close", "Cookie", "")]
+        [InlineData("a:b\r\n\r\n", "a", "b", null, null)]
         public void ParseHeadersCanParseEmptyHeaderValues(
             string rawHeaders,
             string expectedHeaderName1,
@@ -328,6 +329,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         [InlineData("Connection: close\r\nCookie: \n\r\n", "Connection", "close", "Cookie", "")]
         [InlineData("Connection: close\nCookie:\r\n\r\n", "Connection", "close", "Cookie", "")]
         [InlineData("Connection: close\r\nCookie:\n\r\n", "Connection", "close", "Cookie", "")]
+        [InlineData("a:b\n\r\n", "a", "b", null, null)]
         public void ParseHeadersCanParseSingleLineFeedInQuirkMode(
             string rawHeaders,
             string expectedHeaderName1,

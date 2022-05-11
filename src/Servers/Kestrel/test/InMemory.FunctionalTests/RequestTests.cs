@@ -1097,7 +1097,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ContentLengthReadAsyncPipeReaderReadsCompletedBody()
         {
-            var testContext = new TestServiceContext(LoggerFactory);
+            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
 
             await using (var server = new TestServer(async httpContext =>
             {

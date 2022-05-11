@@ -224,7 +224,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http
                         {
                             var headerSpan = span[..length]; 
 
-                            if (length < 4)
+                            if (length < 3)
                             {
                                 // Less than min possible headerSpan of 3 bytes a:b
                                 RejectRequestHeader(headerSpan);
