@@ -130,34 +130,16 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http
             // Consume space
             offset++;
 
-            if (!_enableLineFeedTerminator)
+            // Version + CR is 9 bytes which should take us to .Length
+            // LF should have been dropped prior to method call
+            if ((uint)offset + 9 != (uint)requestLine.Length || requestLine[offset + 8] != ByteCR)
             {
-                // Version + CR is 9 bytes which should take us to .Length
                 // LF should have been dropped prior to method call
-                if ((uint)offset + 9 != (uint)requestLine.Length || requestLine[offset + 8] != ByteCR)
+                // If _enableLineFeedTerminator and offset + 8 is .Length,
+                // then requestLine is valid since it mean LF was the next char
+                if (!_enableLineFeedTerminator || (uint)offset + 8 != (uint)requestLine.Length)
                 {
                     RejectRequestLine(requestLine);
-                }
-            }
-            else
-            {
-                // LF should have been dropped prior to method call
-                // If offset + 8 is .Length then requestLine is valid since it mean LF was the next char
-                if ((uint)offset + 8 != (uint)requestLine.Length)
-                {
-                    // Version + CR is 9 bytes which should take us to .Length
-                    if ((uint)offset + 9 != (uint)requestLine.Length || requestLine[offset + 8] != ByteCR)
-                    {
-                        RejectRequestLine(requestLine);
-                    }
-                }
-                else 
-                {
-                    // e.g., GET / HTTP1.\r\n
-                    if (requestLine[offset + 7] == ByteCR)
-                    {
-                        RejectRequestLine(requestLine);
-                    }
                 }
             }
 
