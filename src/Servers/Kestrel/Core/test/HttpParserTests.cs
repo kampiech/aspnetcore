@@ -306,7 +306,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         [InlineData("a: b\n\r\n", "a", "b", null, null)]
         [InlineData("a:b\n\n", "a", "b", null, null)]
         [InlineData("a: b\n\n", "a", "b", null, null)]
-        public void ParseHeadersCantParseSingleLineFeedWihtoutLineFeedTerminatorEnableb(
+        public void ParseHeadersCantParseSingleLineFeedWihtoutLineFeedTerminatorEnabled(
             string rawHeaders,
             string expectedHeaderName1,
             string expectedHeaderValue1,
@@ -381,6 +381,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         [InlineData("a:b\n\r\n", "a", "b", null, null)]
         [InlineData("a: b\n\r\n", "a", "b", null, null)]
         [InlineData("a: b\nc: d\n\r\n", "a", "b", "c", "d")]
+        [InlineData("a: b\nc: d\n\n", "a", "b", "c", "d")]
+        [InlineData("a: b\n\n", "a", "b", null, null)]
         public void ParseHeadersCanEndAfterLineFeedTerminator(
                     string rawHeaders,
                     string expectedHeaderName1,
