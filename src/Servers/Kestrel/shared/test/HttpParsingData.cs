@@ -454,7 +454,7 @@ namespace Microsoft.AspNetCore.Testing
 
             // Headers not ending in CRLF line
             new[] { "Header-1: value1\r\nHeader-2: value2\r\n\r\r", CoreStrings.BadRequest_InvalidRequestHeadersNoCRLF },
-            new[] { "Header-1: value1\r\nHeader-2: value2\r\n\r ", CoreStrings.BadRequest_InvalidRequestHeadersNoCRLF  },
+            new[] { "Header-1: value1\r\nHeader-2: value2\r\n\r ", CoreStrings.BadRequest_InvalidRequestHeadersNoCRLF },
             new[] { "Header-1: value1\r\nHeader-2: value2\r\n\r \n", CoreStrings.BadRequest_InvalidRequestHeadersNoCRLF },
 
             // Empty header name

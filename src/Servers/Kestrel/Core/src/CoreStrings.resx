@@ -148,7 +148,7 @@
     <value>Invalid Host header: '{detail}'</value>
   </data>
   <data name="BadRequest_InvalidRequestHeadersNoCRLF" xml:space="preserve">
-    <value>Invalid request headers: missing final CRLF in header fields.</value>
+    <value>Invalid CR before CRLF to complete the header.</value>
   </data>
   <data name="BadRequest_InvalidRequestHeader_Detail" xml:space="preserve">
     <value>Invalid request header: '{detail}'</value>
