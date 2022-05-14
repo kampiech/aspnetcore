@@ -164,15 +164,38 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http
             while (!reader.End)
             {
                 var span = reader.UnreadSpan;
+
+                // Size of header in the current span, if known
+                var length = -1;
+
                 while (span.Length > 0)
                 {
-                    var length = ParseHeaderLineEnd(span, out var endBytes);
+                    // The size of the EOL terminator. Always 0 (no valid EOL), 1 (LF) or 2 (CRLF)
+                    var eolSize = 0;
 
-                    // Empty header
+                    // length can be set when the span is returned by ParseMultiSpanHeader
+                    if (length == -1)
+                    {
+                        length = span.IndexOfAny(ByteCR, ByteLF);
+                    }
+
+                    if (length != -1)
+                    {
+                        // Validate the EOL terminator
+                        eolSize = ParseHeaderLineEnd(span, length);
+
+                        // Not valid
+                        if (eolSize == 0)
+                        {
+                            length = -1;
+                        }
+                    }                    
+
+                    // Empty header (EOL only)?
                     if (length == 0)
                     {
                         handler.OnHeadersComplete(endStream: false);
-                        reader.Advance(endBytes);
+                        reader.Advance(eolSize);
                         return true;
                     }
 
@@ -181,7 +204,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http
                     // the bounds check for the next lookup of span[length]
                     if ((uint)length < (uint)span.Length)
                     {
-                        var lineLength = length + endBytes;
+                        var lineLength = length + eolSize;
 
                         if (length != 0 && !TryTakeSingleHeader(handler, span[..length]))
                         {
@@ -198,11 +221,12 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http
                     // End found in current span
                     if (length > 0)
                     {
+                        length = -1;
                         continue;
                     }
 
                     // Load next header line to parse as a span
-                    span = ParseMultiSpanHeader(ref reader);
+                    span = ParseMultiSpanHeader(ref reader, out length);
 
                     // If there any remaining line?
                     if (length == -1 && span.Length == 0)
@@ -215,60 +239,50 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http
             return false;
         }
 
-        // Returns the length of the header key:value and EOL.
-        // If no valid EOL is detected length = -1
-        // If the line is empty (only EOL) then length = 0
-        private int ParseHeaderLineEnd(ReadOnlySpan<byte> headerSpan, out int endLength)
+        // Returns the length of the line terminator (CRLF = 2, LF = 1)
+        // If no valid EOL is detected then -1
+        private int ParseHeaderLineEnd(ReadOnlySpan<byte> headerSpan, int length)
         {
-            endLength = -1;
-
-            var index = headerSpan.IndexOfAny(ByteCR, ByteLF);
-
-            if (index == -1)
-            {
-                return -1;
-            }
-
-            if (headerSpan[index] == ByteCR)
+            if (headerSpan[length] == ByteCR)
             {
                 // No more chars after CR? Don't consume an incomplete header
-                if (headerSpan.Length == index + 1)
+                if (headerSpan.Length == length + 1)
                 {
-                    return -1;
+                    return 0;
                 }
 
                 // CR must be followed by LF in all cases
-                if (headerSpan[index + 1] != ByteLF)
+                if (headerSpan[length + 1] != ByteLF)
                 {
-                    if (index == 0)
+                    if (length == 0)
                     {
                         KestrelBadHttpRequestException.Throw(RequestRejectionReason.InvalidRequestHeadersNoCRLF);
                     }
                     else
                     {
-                        RejectRequestHeader(headerSpan[..(index + 2)]);
+                        RejectRequestHeader(headerSpan[..(length + 2)]);
                     }
                 }
 
-                endLength = 2;
-                return index;
+                return 2;
             }
 
             if (_enableLineFeedTerminator)
             {
-                endLength = 1;
-                return index;
+                return 1;
             }
 
             // LF but not allowed
-            RejectRequestHeader(headerSpan[..(index + 1)]);
+            RejectRequestHeader(headerSpan[..(length + 1)]);
 
-            return -1;
+            return 0;
         }
 
         // Returns a span from the remaining sequence until the next valid EOL
-        private ReadOnlySpan<byte> ParseMultiSpanHeader(ref SequenceReader<byte> reader)
+        private ReadOnlySpan<byte> ParseMultiSpanHeader(ref SequenceReader<byte> reader, out int length)
         {
+            length = -1;
+
             var currentSlice = reader.UnreadSequence;
             var lineEndPosition = currentSlice.PositionOfAny(ByteCR, ByteLF);
 
@@ -290,6 +304,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http
 
                 if (headerSpan[^1] == ByteLF)
                 {
+                    length = headerSpan.Length - 1;
                     return headerSpan;
                 }
 
@@ -300,6 +315,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http
             lineEnd = currentSlice.GetPosition(2, lineEndPosition.Value);
             headerSpan = currentSlice.Slice(reader.Position, lineEnd).ToSpan();
 
+            length = headerSpan.Length - 2;
             return headerSpan;
         }
 
