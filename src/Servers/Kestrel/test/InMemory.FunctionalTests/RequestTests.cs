@@ -25,17 +25,6 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
 {
     public class RequestTests : TestApplicationErrorLoggerLoggedTest
     {
-        private readonly bool _enableLineFeedTerminator;
-
-        public RequestTests() : this(false)
-        {            
-        }
-
-        protected RequestTests(bool enableLineFeedTerminator)
-        {
-            _enableLineFeedTerminator = enableLineFeedTerminator;
-        }
-        
         [Fact]
         public async Task StreamsAreNotPersistedAcrossRequests()
         {
@@ -58,7 +47,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                 context.Response.Body = new MemoryStream();
 
                 await context.Response.WriteAsync("hello, world");
-            }, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            }, new TestServiceContext(LoggerFactory)))
             {
                 Assert.Equal(string.Empty, await server.HttpClientSlim.GetStringAsync($"http://localhost:{server.Port}/"));
                 Assert.Equal(string.Empty, await server.HttpClientSlim.GetStringAsync($"http://localhost:{server.Port}/"));
@@ -82,7 +71,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                 bodyPipe = context.Response.BodyWriter;
 
                 await context.Response.WriteAsync("hello, world");
-            }, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            }, new TestServiceContext(LoggerFactory)))
             {
                 Assert.Equal("hello, world", await server.HttpClientSlim.GetStringAsync($"http://localhost:{server.Port}/"));
                 Assert.Equal("hello, world", await server.HttpClientSlim.GetStringAsync($"http://localhost:{server.Port}/"));
@@ -130,7 +119,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                     await context.Response.WriteAsync("Read cancelled");
                 }
 
-            }, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            }, new TestServiceContext(LoggerFactory)))
             {
                 using (var connection = server.CreateConnection())
                 {
@@ -172,7 +161,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                 await stream.FillEntireBufferAsync(data).DefaultTimeout();
 
                 dataRead = Encoding.ASCII.GetString(data) == "abc";
-            }, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            }, new TestServiceContext(LoggerFactory)))
             {
                 using (var connection = server.CreateConnection())
                 {
@@ -223,7 +212,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                 queryTcs.TrySetResult(context.Request.Query);
                 rawTargetTcs.TrySetResult(context.Features.Get<IHttpRequestFeature>().RawTarget);
                 await context.Response.WriteAsync("Done");
-            }, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            }, new TestServiceContext(LoggerFactory)))
             {
                 using (var connection = server.CreateConnection())
                 {
@@ -267,7 +256,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         public async Task CanHandleTwoAbsoluteFormRequestsInARow()
         {
             // Regression test for https://github.com/dotnet/aspnetcore/issues/18438
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(TestApp.EchoAppChunked, testContext))
             {
@@ -323,7 +312,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                 return context.Response.WriteAsync($"{value}");
             }
 
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using var server = new TestServer(ExecuteApplication, testContext);
             await TestAsyncLocalValues(testContext, server);
@@ -360,7 +349,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                 return context.Response.WriteAsync($"{value}");
             }
 
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using var server = new TestServer(ExecuteApplication, testContext);
             await TestAsyncLocalValues(testContext, server);
@@ -394,7 +383,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                 return context.Response.WriteAsync($"{value}");
             }
 
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using var server = new TestServer(ExecuteApplication, testContext);
             await TestAsyncLocalValues(testContext, server);
@@ -432,7 +421,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                 Assert.Equal(2, local.Value);
             }
 
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using var server = new TestServer(ExecuteApplication, testContext);
             await TestAsyncLocalValues(testContext, server);
@@ -473,7 +462,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                 Assert.Equal(3, local.Value.Value); // Third
             }
 
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using var server = new TestServer(ExecuteApplication, testContext);
             await TestAsyncLocalValues(testContext, server);
@@ -516,7 +505,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                 Assert.Equal(2, local.Value);
             }
 
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using var server = new TestServer(ExecuteApplication, testContext);
             await TestAsyncLocalValues(testContext, server);
@@ -561,7 +550,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
             {
                 context.TraceIdentifier = knownId;
                 await context.Response.WriteAsync(context.TraceIdentifier);
-            }, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            }, new TestServiceContext(LoggerFactory)))
             {
                 var requestId = await server.HttpClientSlim.GetStringAsync($"http://localhost:{server.Port}/");
                 Assert.Equal(knownId, requestId);
@@ -579,7 +568,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                 Assert.Equal(identifierLength, Encoding.ASCII.GetByteCount(context.TraceIdentifier));
                 context.Response.ContentLength = identifierLength;
                 await context.Response.WriteAsync(context.TraceIdentifier);
-            }, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            }, new TestServiceContext(LoggerFactory)))
             {
                 var usedIds = new ConcurrentBag<string>();
 
@@ -627,7 +616,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task Http11KeptAliveByDefault()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(TestApp.EchoAppChunked, testContext))
             {
@@ -661,7 +650,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task Http10NotKeptAliveByDefault()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(TestApp.EchoApp, testContext))
             {
@@ -700,7 +689,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task Http10KeepAlive()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(TestApp.EchoAppChunked, testContext))
             {
@@ -735,7 +724,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task Http10KeepAliveNotHonoredIfResponseContentLengthNotSet()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(TestApp.EchoApp, testContext))
             {
@@ -774,7 +763,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task Http10KeepAliveHonoredIfResponseContentLengthSet()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(TestApp.EchoAppChunked, testContext))
             {
@@ -830,7 +819,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task Expect100ContinueHonored()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(TestApp.EchoAppChunked, testContext))
             {
@@ -862,7 +851,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task Expect100ContinueHonoredWhenMinRequestBodyDataRateIsDisabled()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             // This may seem unrelated, but this is a regression test for
             // https://github.com/dotnet/aspnetcore/issues/30449
@@ -898,7 +887,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ZeroContentLengthAssumedOnNonKeepAliveRequestsWithoutContentLengthOrTransferEncodingHeader()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(async httpContext =>
             {
@@ -944,7 +933,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ZeroContentLengthAssumedOnNonKeepAliveRequestsWithoutContentLengthOrTransferEncodingHeaderPipeReader()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(async httpContext =>
             {
@@ -991,7 +980,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ContentLengthReadAsyncPipeReader()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(async httpContext =>
             {
@@ -1023,7 +1012,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ContentLengthReadAsyncPipeReaderBufferRequestBody()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(async httpContext =>
             {
@@ -1058,7 +1047,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ContentLengthReadAsyncPipeReaderBufferRequestBodyMultipleTimes()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(async httpContext =>
             {
@@ -1097,7 +1086,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ContentLengthReadAsyncPipeReaderReadsCompletedBody()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(async httpContext =>
             {
@@ -1134,7 +1123,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ContentLengthReadAsyncSingleBytesAtATime()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var tcs2 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -1208,7 +1197,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ContentLengthDoesNotConsumeEntireBufferDoesNotThrow()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
             await using (var server = new TestServer(async httpContext =>
             {
                 var readResult = await httpContext.Request.BodyReader.ReadAsync();
@@ -1242,7 +1231,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact(Skip = "This test is racy and requires a product change.")]
         public async Task ConnectionClosesWhenFinReceivedBeforeRequestCompletes()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)
+            var testContext = new TestServiceContext(LoggerFactory)
             {
                 Scheduler = PipeScheduler.Inline
             };
@@ -1274,7 +1263,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task RequestHeadersAreResetOnEachRequest()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             IHeaderDictionary originalRequestHeaders = null;
             var firstRequest = true;
@@ -1326,7 +1315,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         {
             const string message = "Hello World";
 
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(async context =>
             {
@@ -1360,7 +1349,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task HeadersAndStreamsAreReusedAcrossRequests()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
             var streamCount = 0;
             var requestHeadersCount = 0;
             var responseHeadersCount = 0;
@@ -1437,7 +1426,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [MemberData(nameof(HostHeaderData))]
         public async Task MatchesValidRequestTargetAndHostHeader(string request, string hostHeader)
         {
-            await using (var server = new TestServer(context => Task.CompletedTask, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            await using (var server = new TestServer(context => Task.CompletedTask, new TestServiceContext(LoggerFactory)))
             {
                 using (var connection = server.CreateConnection())
                 {
@@ -1455,7 +1444,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         public async Task ServerConsumesKeepAliveContentLengthRequest()
         {
             // The app doesn't read the request body, so it should be consumed by the server
-            await using (var server = new TestServer(context => Task.CompletedTask, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            await using (var server = new TestServer(context => Task.CompletedTask, new TestServiceContext(LoggerFactory)))
             {
                 using (var connection = server.CreateConnection())
                 {
@@ -1496,7 +1485,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         public async Task ServerConsumesKeepAliveChunkedRequest()
         {
             // The app doesn't read the request body, so it should be consumed by the server
-            await using (var server = new TestServer(context => Task.CompletedTask, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            await using (var server = new TestServer(context => Task.CompletedTask, new TestServiceContext(LoggerFactory)))
             {
                 using (var connection = server.CreateConnection())
                 {
@@ -1544,7 +1533,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         public async Task NonKeepAliveRequestNotConsumedByAppCompletes()
         {
             // The app doesn't read the request body, so it should be consumed by the server
-            await using (var server = new TestServer(context => Task.CompletedTask, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            await using (var server = new TestServer(context => Task.CompletedTask, new TestServiceContext(LoggerFactory)))
             {
                 using (var connection = server.CreateConnection())
                 {
@@ -1577,7 +1566,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
 
                 var response = Encoding.ASCII.GetBytes("goodbye");
                 await duplexStream.WriteAsync(response, 0, response.Length);
-            }, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            }, new TestServiceContext(LoggerFactory)))
             {
                 using (var connection = server.CreateConnection())
                 {
@@ -1604,7 +1593,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         {
             var appEvent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var delayEvent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var serviceContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var serviceContext = new TestServiceContext(LoggerFactory);
             var heartbeatManager = new HeartbeatManager(serviceContext.ConnectionManager);
 
             await using (var server = new TestServer(async context =>
@@ -1689,7 +1678,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
 
                 context.Response.ContentLength = 6;
                 await context.Response.Body.WriteAsync(buffer, 0, 6);
-            }, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            }, new TestServiceContext(LoggerFactory)))
             {
                 using (var connection = server.CreateConnection())
                 {
@@ -1732,7 +1721,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
 
                 context.Response.ContentLength = 5;
                 await context.Response.Body.WriteAsync(buffer, 0, 5);
-            }, new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)))
+            }, new TestServiceContext(LoggerFactory)))
             {
                 using (var connection = server.CreateConnection())
                 {
@@ -1755,7 +1744,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task SynchronousReadsCanBeDisallowedGlobally()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)
+            var testContext = new TestServiceContext(LoggerFactory)
             {
                 ServerOptions = { AllowSynchronousIO = false }
             };
@@ -1800,7 +1789,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task SynchronousReadsCanBeAllowedGlobally()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator)
+            var testContext = new TestServiceContext(LoggerFactory)
             {
                 ServerOptions = { AllowSynchronousIO = true }
             };
@@ -1842,7 +1831,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ContentLengthSwallowedUnexpectedEndOfRequestContentDoesNotResultInWarnings()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(async httpContext =>
             {
@@ -1876,7 +1865,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         public async Task ContentLengthRequestCallCancelPendingReadWorks()
         {
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(async httpContext =>
             {
@@ -1926,7 +1915,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ContentLengthRequestCallCompleteThrowsExceptionOnRead()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(async httpContext =>
             {
@@ -1970,7 +1959,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ContentLengthRequestCallCompleteDoesNotCauseException()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             await using (var server = new TestServer(async httpContext =>
@@ -2011,7 +2000,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ContentLengthCallCompleteWithExceptionCauses500()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(async httpContext =>
             {
@@ -2053,7 +2042,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task ReuseRequestHeaderStrings()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
             string customHeaderValue = null;
             string contentTypeHeaderValue = null;
 
@@ -2108,7 +2097,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task PersistentStateBetweenRequests()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
             object persistedState = null;
             var requestCount = 0;
 
@@ -2170,7 +2159,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task Latin1HeaderValueAcceptedWhenLatin1OptionIsConfigured()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             testContext.ServerOptions.RequestHeaderEncodingSelector = _ => Encoding.Latin1;
 
@@ -2204,7 +2193,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task Latin1HeaderValueRejectedWhenLatin1OptionIsNotConfigured()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             await using (var server = new TestServer(_ => Task.CompletedTask, testContext))
             {
@@ -2233,7 +2222,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         [Fact]
         public async Task CustomRequestHeaderEncodingSelectorCanBeConfigured()
         {
-            var testContext = new TestServiceContext(LoggerFactory, _enableLineFeedTerminator);
+            var testContext = new TestServiceContext(LoggerFactory);
 
             testContext.ServerOptions.RequestHeaderEncodingSelector = _ => Encoding.UTF32;
 
@@ -2266,19 +2255,54 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
             }
         }
 
+        [Fact]
+        public async Task SingleLineFeedIsSupportedAnywhere()
+        {
+            // Exercises all combinations of LF and CRLF as line separators.
+            // Uses a bit mask for all the possible combinations.
+
+            var lines = new[]
+            {
+                $"GET / HTTP/1.1",
+                "Content-Length: 0",
+                $"Host: localhost",
+                "",
+            };
+
+            await using (var server = new TestServer(context => Task.CompletedTask, new TestServiceContext(LoggerFactory, true)))
+            {
+                var mask = Math.Pow(2, lines.Length) - 1;
+
+                for (var m = 0; m <= mask; m++)
+                {
+                    using (var client = server.CreateConnection())
+                    {
+                        var sb = new StringBuilder();
+
+                        for (var pos = 0; pos < lines.Length; pos++)
+                        {
+                            sb.Append(lines[pos]);
+                            var separator = (m & (1 << pos)) != 0 ? "\n" : "\r\n";
+                            sb.Append(separator);
+                        }
+
+                        var text = sb.ToString();
+                        var writer = new StreamWriter(client.Stream, Encoding.GetEncoding("iso-8859-1"));
+                        await writer.WriteAsync(text).ConfigureAwait(false);
+                        await writer.FlushAsync().ConfigureAwait(false);
+                        await client.Stream.FlushAsync().ConfigureAwait(false);
+
+                        await client.Receive("HTTP/1.1 200");
+                    }
+                }
+            }
+        }
+
         public static TheoryData<string, string> HostHeaderData => HttpParsingData.HostHeaderData;
 
         private class IntAsClass
         {
             public int Value;
-        }
-    }
-
-    // Ensure that all common tests are still passing when the AcceptLineFeedAsLineTerminator quirk mode is enabled.
-    public class RequestTestsQuirkMode : RequestTests
-    {
-        public RequestTestsQuirkMode() : base(true)
-        {
         }
     }
 }

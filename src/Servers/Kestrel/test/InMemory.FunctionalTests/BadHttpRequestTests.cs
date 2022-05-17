@@ -3,6 +3,7 @@
 
 using System.Diagnostics;
 using System.Net;
+using System.Text;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
@@ -18,17 +19,6 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
 {
     public class BadHttpRequestTests : LoggedTest
     {
-        private readonly bool _enableLineFeedTerminator;
-
-        public BadHttpRequestTests() : this(false)
-        {            
-        }
-
-        protected BadHttpRequestTests(bool enableLineFeedTerminator)
-        {
-            _enableLineFeedTerminator = enableLineFeedTerminator;
-        }
-
         [Theory]
         [MemberData(nameof(InvalidRequestLineData))]
         public Task TestInvalidRequestLines(string request, string expectedExceptionMessage)
@@ -57,28 +47,6 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                 $"GET / HTTP/1.1\r\n{rawHeaders}",
                 "400 Bad Request",
                 expectedExceptionMessage);
-        }
-
-        [Theory]
-        [MemberData(nameof(InvalidRequestHeaderDataLineFeedTerminator))]
-        public async Task TestInvalidHeadersQuirkMode(string rawHeaders, string expectedExceptionMessage)
-        {
-            var task = TestBadRequest(
-                $"GET / HTTP/1.1\r\n{rawHeaders}",
-                "400 Bad Request",
-                expectedExceptionMessage);
-
-            // These should not fail in quirk mode
-            if (_enableLineFeedTerminator)
-            {
-                // Unit test should fail since it expects a bad request
-                await Assert.ThrowsAnyAsync<Exception>(async () => await task);
-            }
-            else
-            {
-                // Should fail successfully
-                await task;
-            }
         }
 
         public static Dictionary<string, (string header, string errorMessage)> BadHeaderData => new Dictionary<string, (string, string)>
@@ -339,7 +307,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
                 }
             });
 
-            await using (var server = new TestServer(context => Task.CompletedTask, new TestServiceContext(LoggerFactory, mockKestrelTrace.Object, _enableLineFeedTerminator) { DiagnosticSource = diagListener }))
+            await using (var server = new TestServer(context => Task.CompletedTask, new TestServiceContext(LoggerFactory, mockKestrelTrace.Object) { DiagnosticSource = diagListener }))
             {
                 using (var connection = server.CreateConnection())
                 {
@@ -405,13 +373,5 @@ namespace Microsoft.AspNetCore.Server.Kestrel.InMemory.FunctionalTests
         public static IEnumerable<object[]> InvalidRequestHeaderDataLineFeedTerminator => HttpParsingData.RequestHeaderInvalidDataLineFeedTerminator;
 
         public static TheoryData<string, string> InvalidHostHeaderData => HttpParsingData.HostHeaderInvalidData;
-    }
-
-    // Ensure that all common tests are still passing when the AcceptLineFeedAsLineTerminator quirk mode is enabled.
-    public class BadHttpRequestTestsQuirksMode : BadHttpRequestTests
-    {
-        public BadHttpRequestTestsQuirksMode() : base(true)
-        {
-        }
     }
 }
