@@ -3,13 +3,20 @@
 
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Microsoft.AspNetCore.JsonPatch.Adapters;
 using Microsoft.AspNetCore.JsonPatch.Converters;
 using Microsoft.AspNetCore.JsonPatch.Exceptions;
 using Microsoft.AspNetCore.JsonPatch.Internal;
 using Microsoft.AspNetCore.JsonPatch.Operations;
+using Microsoft.AspNetCore.Shared;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
+
+#if NET
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http.Metadata;
+#endif
 
 namespace Microsoft.AspNetCore.JsonPatch;
 
@@ -17,7 +24,11 @@ namespace Microsoft.AspNetCore.JsonPatch;
 // documents for cases where there's no class/DTO to work on. Typical use case: backend not built in
 // .NET or architecture doesn't contain a shared DTO layer.
 [JsonConverter(typeof(JsonPatchDocumentConverter))]
+#if NET
+public class JsonPatchDocument : IJsonPatchDocument, IEndpointParameterMetadataProvider
+#else
 public class JsonPatchDocument : IJsonPatchDocument
+#endif
 {
     public List<Operation> Operations { get; private set; }
 
@@ -26,21 +37,14 @@ public class JsonPatchDocument : IJsonPatchDocument
 
     public JsonPatchDocument()
     {
-        Operations = new List<Operation>();
+        Operations = [];
         ContractResolver = new DefaultContractResolver();
     }
 
     public JsonPatchDocument(List<Operation> operations, IContractResolver contractResolver)
     {
-        if (operations == null)
-        {
-            throw new ArgumentNullException(nameof(operations));
-        }
-
-        if (contractResolver == null)
-        {
-            throw new ArgumentNullException(nameof(contractResolver));
-        }
+        ArgumentNullThrowHelper.ThrowIfNull(operations);
+        ArgumentNullThrowHelper.ThrowIfNull(contractResolver);
 
         Operations = operations;
         ContractResolver = contractResolver;
@@ -55,10 +59,7 @@ public class JsonPatchDocument : IJsonPatchDocument
     /// <returns>The <see cref="JsonPatchDocument"/> for chaining.</returns>
     public JsonPatchDocument Add(string path, object value)
     {
-        if (path == null)
-        {
-            throw new ArgumentNullException(nameof(path));
-        }
+        ArgumentNullThrowHelper.ThrowIfNull(path);
 
         Operations.Add(new Operation("add", PathHelpers.ValidateAndNormalizePath(path), null, value));
         return this;
@@ -72,10 +73,7 @@ public class JsonPatchDocument : IJsonPatchDocument
     /// <returns>The <see cref="JsonPatchDocument"/> for chaining.</returns>
     public JsonPatchDocument Remove(string path)
     {
-        if (path == null)
-        {
-            throw new ArgumentNullException(nameof(path));
-        }
+        ArgumentNullThrowHelper.ThrowIfNull(path);
 
         Operations.Add(new Operation("remove", PathHelpers.ValidateAndNormalizePath(path), null, null));
         return this;
@@ -90,10 +88,7 @@ public class JsonPatchDocument : IJsonPatchDocument
     /// <returns>The <see cref="JsonPatchDocument"/> for chaining.</returns>
     public JsonPatchDocument Replace(string path, object value)
     {
-        if (path == null)
-        {
-            throw new ArgumentNullException(nameof(path));
-        }
+        ArgumentNullThrowHelper.ThrowIfNull(path);
 
         Operations.Add(new Operation("replace", PathHelpers.ValidateAndNormalizePath(path), null, value));
         return this;
@@ -108,10 +103,7 @@ public class JsonPatchDocument : IJsonPatchDocument
     /// <returns>The <see cref="JsonPatchDocument"/> for chaining.</returns>
     public JsonPatchDocument Test(string path, object value)
     {
-        if (path == null)
-        {
-            throw new ArgumentNullException(nameof(path));
-        }
+        ArgumentNullThrowHelper.ThrowIfNull(path);
 
         Operations.Add(new Operation("test", PathHelpers.ValidateAndNormalizePath(path), null, value));
         return this;
@@ -126,15 +118,8 @@ public class JsonPatchDocument : IJsonPatchDocument
     /// <returns>The <see cref="JsonPatchDocument"/> for chaining.</returns>
     public JsonPatchDocument Move(string from, string path)
     {
-        if (from == null)
-        {
-            throw new ArgumentNullException(nameof(from));
-        }
-
-        if (path == null)
-        {
-            throw new ArgumentNullException(nameof(path));
-        }
+        ArgumentNullThrowHelper.ThrowIfNull(from);
+        ArgumentNullThrowHelper.ThrowIfNull(path);
 
         Operations.Add(new Operation("move", PathHelpers.ValidateAndNormalizePath(path), PathHelpers.ValidateAndNormalizePath(from)));
         return this;
@@ -149,15 +134,8 @@ public class JsonPatchDocument : IJsonPatchDocument
     /// <returns>The <see cref="JsonPatchDocument"/> for chaining.</returns>
     public JsonPatchDocument Copy(string from, string path)
     {
-        if (from == null)
-        {
-            throw new ArgumentNullException(nameof(from));
-        }
-
-        if (path == null)
-        {
-            throw new ArgumentNullException(nameof(path));
-        }
+        ArgumentNullThrowHelper.ThrowIfNull(from);
+        ArgumentNullThrowHelper.ThrowIfNull(path);
 
         Operations.Add(new Operation("copy", PathHelpers.ValidateAndNormalizePath(path), PathHelpers.ValidateAndNormalizePath(from)));
         return this;
@@ -169,10 +147,7 @@ public class JsonPatchDocument : IJsonPatchDocument
     /// <param name="objectToApplyTo">Object to apply the JsonPatchDocument to</param>
     public void ApplyTo(object objectToApplyTo)
     {
-        if (objectToApplyTo == null)
-        {
-            throw new ArgumentNullException(nameof(objectToApplyTo));
-        }
+        ArgumentNullThrowHelper.ThrowIfNull(objectToApplyTo);
 
         ApplyTo(objectToApplyTo, new ObjectAdapter(ContractResolver, null, AdapterFactory.Default));
     }
@@ -195,15 +170,8 @@ public class JsonPatchDocument : IJsonPatchDocument
     /// <param name="logErrorAction">Action to log errors</param>
     public void ApplyTo(object objectToApplyTo, IObjectAdapter adapter, Action<JsonPatchError> logErrorAction)
     {
-        if (objectToApplyTo == null)
-        {
-            throw new ArgumentNullException(nameof(objectToApplyTo));
-        }
-
-        if (adapter == null)
-        {
-            throw new ArgumentNullException(nameof(adapter));
-        }
+        ArgumentNullThrowHelper.ThrowIfNull(objectToApplyTo);
+        ArgumentNullThrowHelper.ThrowIfNull(adapter);
 
         foreach (var op in Operations)
         {
@@ -229,15 +197,8 @@ public class JsonPatchDocument : IJsonPatchDocument
     /// <param name="adapter">IObjectAdapter instance to use when applying</param>
     public void ApplyTo(object objectToApplyTo, IObjectAdapter adapter)
     {
-        if (objectToApplyTo == null)
-        {
-            throw new ArgumentNullException(nameof(objectToApplyTo));
-        }
-
-        if (adapter == null)
-        {
-            throw new ArgumentNullException(nameof(adapter));
-        }
+        ArgumentNullThrowHelper.ThrowIfNull(objectToApplyTo);
+        ArgumentNullThrowHelper.ThrowIfNull(adapter);
 
         // apply each operation in order
         foreach (var op in Operations)
@@ -254,12 +215,13 @@ public class JsonPatchDocument : IJsonPatchDocument
         {
             foreach (var op in Operations)
             {
-                var untypedOp = new Operation();
-
-                untypedOp.op = op.op;
-                untypedOp.value = op.value;
-                untypedOp.path = op.path;
-                untypedOp.from = op.from;
+                var untypedOp = new Operation
+                {
+                    op = op.op,
+                    value = op.value,
+                    path = op.path,
+                    from = op.from
+                };
 
                 allOps.Add(untypedOp);
             }
@@ -267,4 +229,15 @@ public class JsonPatchDocument : IJsonPatchDocument
 
         return allOps;
     }
+
+#if NET
+    /// <inheritdoc/>
+    static void IEndpointParameterMetadataProvider.PopulateMetadata(ParameterInfo parameter, EndpointBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(parameter);
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.Metadata.Add(new AcceptsMetadata(["application/json-patch+json"], parameter.ParameterType));
+    }
+#endif
 }

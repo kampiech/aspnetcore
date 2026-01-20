@@ -19,8 +19,7 @@ internal sealed class CertificateAuthenticationHandler : AuthenticationHandler<C
     public CertificateAuthenticationHandler(
         IOptionsMonitor<CertificateAuthenticationOptions> options,
         ILoggerFactory logger,
-        UrlEncoder encoder,
-        ISystemClock clock) : base(options, logger, encoder, clock)
+        UrlEncoder encoder) : base(options, logger, encoder)
     {
     }
 
@@ -87,10 +86,7 @@ internal sealed class CertificateAuthenticationHandler : AuthenticationHandler<C
                 }
             }
 
-            if (_cache != null)
-            {
-                _cache.Put(Context, clientCertificate, result);
-            }
+            _cache?.Put(Context, clientCertificate, result);
             return result;
         }
         catch (Exception ex)
@@ -126,7 +122,7 @@ internal sealed class CertificateAuthenticationHandler : AuthenticationHandler<C
             !Options.AllowedCertificateTypes.HasFlag(CertificateTypes.SelfSigned))
         {
             Logger.CertificateRejected("Self signed", clientCertificate.Subject);
-            return AuthenticateResult.Fail("Options do not allow self signed certificates.");
+            return AuthenticateResults.NoSelfSigned;
         }
 
         // If we have a chained cert, and they're not allowed, exit early and not bother with
@@ -135,25 +131,39 @@ internal sealed class CertificateAuthenticationHandler : AuthenticationHandler<C
             !Options.AllowedCertificateTypes.HasFlag(CertificateTypes.Chained))
         {
             Logger.CertificateRejected("Chained", clientCertificate.Subject);
-            return AuthenticateResult.Fail("Options do not allow chained certificates.");
+            return AuthenticateResults.NoChainedCertificates;
         }
 
         var chainPolicy = BuildChainPolicy(clientCertificate, isCertificateSelfSigned);
-        using var chain = new X509Chain
+        var chain = new X509Chain
         {
             ChainPolicy = chainPolicy
         };
 
-        var certificateIsValid = chain.Build(clientCertificate);
-        if (!certificateIsValid)
+        try
         {
-            var chainErrors = new List<string>(chain.ChainStatus.Length);
-            foreach (var validationFailure in chain.ChainStatus)
+            var certificateIsValid = chain.Build(clientCertificate);
+            if (!certificateIsValid)
             {
-                chainErrors.Add($"{validationFailure.Status} {validationFailure.StatusInformation}");
+                var chainErrors = new List<string>(chain.ChainStatus.Length);
+                foreach (var validationFailure in chain.ChainStatus)
+                {
+                    chainErrors.Add($"{validationFailure.Status} {validationFailure.StatusInformation}");
+                }
+                Logger.CertificateFailedValidation(clientCertificate.Subject, chainErrors);
+                return AuthenticateResults.InvalidClientCertificate;
             }
-            Logger.CertificateFailedValidation(clientCertificate.Subject, chainErrors);
-            return AuthenticateResult.Fail("Client certificate failed validation.");
+        }
+        finally
+        {
+            // Disposing the chain does not dispose the elements we potentially built.
+            // Do the full walk manually to dispose.
+            for (var i = 0; i < chain.ChainElements.Count; i++)
+            {
+                chain.ChainElements[i].Certificate.Dispose();
+            }
+
+            chain.Dispose();
         }
 
         var certificateValidatedContext = new CertificateValidatedContext(Context, Scheme, Options)

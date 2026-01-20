@@ -5,6 +5,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.AspNetCore.Builder;
 
@@ -19,15 +20,20 @@ public class StatusCodePagesOptions
     /// </summary>
     public StatusCodePagesOptions()
     {
-        HandleAsync = context =>
+        HandleAsync = async context =>
         {
-            // TODO: Render with a pre-compiled html razor view.
             var statusCode = context.HttpContext.Response.StatusCode;
+            var problemDetailsService = context.HttpContext.RequestServices.GetService<IProblemDetailsService>();
 
-            var body = BuildResponseBody(statusCode);
+            if (problemDetailsService == null ||
+                !await problemDetailsService.TryWriteAsync(new() { HttpContext = context.HttpContext, ProblemDetails = { Status = statusCode } }))
+            {
+                // TODO: Render with a pre-compiled html razor view
+                var body = BuildResponseBody(statusCode);
 
-            context.HttpContext.Response.ContentType = "text/plain";
-            return context.HttpContext.Response.WriteAsync(body);
+                context.HttpContext.Response.ContentType = "text/plain";
+                await context.HttpContext.Response.WriteAsync(body);
+            }
         };
     }
 
@@ -49,4 +55,13 @@ public class StatusCodePagesOptions
     /// The handler that generates the response body for the given <see cref="StatusCodeContext"/>. By default this produces a plain text response that includes the status code.
     /// </summary>
     public Func<StatusCodeContext, Task> HandleAsync { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the handler needs to create a separate <see cref="IServiceProvider"/> scope and
+    /// replace it on <see cref="HttpContext.RequestServices"/> when re-executing the request.
+    /// </summary>
+    /// <remarks>The default value is <see langword="false"/>.</remarks>
+    public bool CreateScopeForStatusCodePages { get; set; }
+
+    internal string? PathFormat { get; set; }
 }

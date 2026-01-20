@@ -9,6 +9,14 @@ namespace Microsoft.AspNetCore.Authentication.Negotiate;
 public class NegotiateOptions : AuthenticationSchemeOptions
 {
     /// <summary>
+    /// Initializes a new instance of <see cref="NegotiateOptions"/>.
+    /// </summary>
+    public NegotiateOptions()
+    {
+        Events = new NegotiateEvents();
+    }
+
+    /// <summary>
     /// The object provided by the application to process events raised by the negotiate authentication handler.
     /// The application may use the existing NegotiateEvents instance and assign delegates only to the events it
     /// wants to process. The application may also replace it with its own derived instance.
@@ -45,10 +53,7 @@ public class NegotiateOptions : AuthenticationSchemeOptions
     /// </summary>
     public void EnableLdap(string domain)
     {
-        if (string.IsNullOrEmpty(domain))
-        {
-            throw new ArgumentNullException(nameof(domain));
-        }
+        ArgumentException.ThrowIfNullOrEmpty(domain);
 
         LdapSettings.EnableLdapClaimResolution = true;
         LdapSettings.Domain = domain;
@@ -60,10 +65,7 @@ public class NegotiateOptions : AuthenticationSchemeOptions
     /// </summary>
     public void EnableLdap(Action<LdapSettings> configureSettings)
     {
-        if (configureSettings == null)
-        {
-            throw new ArgumentNullException(nameof(configureSettings));
-        }
+        ArgumentNullException.ThrowIfNull(configureSettings);
 
         LdapSettings.EnableLdapClaimResolution = true;
         configureSettings(LdapSettings);
@@ -76,5 +78,5 @@ public class NegotiateOptions : AuthenticationSchemeOptions
     internal bool DeferToServer { get; set; }
 
     // For testing
-    internal INegotiateStateFactory StateFactory { get; set; } = new ReflectedNegotiateStateFactory();
+    internal INegotiateStateFactory StateFactory { get; set; } = new NegotiateStateFactory();
 }

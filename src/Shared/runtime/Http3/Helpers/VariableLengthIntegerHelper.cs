@@ -115,7 +115,7 @@ namespace System.Net.Http
                     if (reader.TryCopyTo(temp))
                     {
                         bool result = TryRead(temp, out value, out int bytesRead);
-                        Debug.Assert(result == true);
+                        Debug.Assert(result);
                         Debug.Assert(bytesRead == length);
 
                         reader.Advance(bytesRead);
@@ -128,19 +128,19 @@ namespace System.Net.Http
             }
         }
 
-        public static long GetInteger(in ReadOnlySequence<byte> buffer, out SequencePosition consumed, out SequencePosition examined)
+        // If callsite has 'examined', set it to buffer.End if the integer wasn't successfully read, otherwise set examined = consumed.
+        public static bool TryGetInteger(in ReadOnlySequence<byte> buffer, out SequencePosition consumed, out long integer)
         {
             var reader = new SequenceReader<byte>(buffer);
-            if (TryRead(ref reader, out long value))
+            if (TryRead(ref reader, out integer))
             {
-                consumed = examined = buffer.GetPosition(reader.Consumed);
-                return value;
+                consumed = buffer.GetPosition(reader.Consumed);
+                return true;
             }
             else
             {
-                consumed = default;
-                examined = buffer.End;
-                return -1;
+                consumed = buffer.Start;
+                return false;
             }
         }
 
@@ -190,7 +190,7 @@ namespace System.Net.Http
         public static int WriteInteger(Span<byte> buffer, long longToEncode)
         {
             bool res = TryWrite(buffer, longToEncode, out int bytesWritten);
-            Debug.Assert(res == true);
+            Debug.Assert(res);
             return bytesWritten;
         }
 

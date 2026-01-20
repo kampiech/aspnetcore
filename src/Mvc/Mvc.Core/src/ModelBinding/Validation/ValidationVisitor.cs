@@ -34,20 +34,9 @@ public class ValidationVisitor
         IModelMetadataProvider metadataProvider,
         ValidationStateDictionary? validationState)
     {
-        if (actionContext == null)
-        {
-            throw new ArgumentNullException(nameof(actionContext));
-        }
-
-        if (validatorProvider == null)
-        {
-            throw new ArgumentNullException(nameof(validatorProvider));
-        }
-
-        if (validatorCache == null)
-        {
-            throw new ArgumentNullException(nameof(validatorCache));
-        }
+        ArgumentNullException.ThrowIfNull(actionContext);
+        ArgumentNullException.ThrowIfNull(validatorProvider);
+        ArgumentNullException.ThrowIfNull(validatorCache);
 
         Context = actionContext;
         ValidatorProvider = validatorProvider;
@@ -259,12 +248,7 @@ public class ValidationVisitor
         {
             // If the field has an entry in ModelState, then record it as valid. Don't create
             // extra entries if they don't exist already.
-            var entry = ModelState[Key];
-            if (entry != null)
-            {
-                entry.ValidationState = ModelValidationState.Valid;
-            }
-
+            ModelState[Key]?.ValidationState = ModelValidationState.Valid;
             return true;
         }
     }
